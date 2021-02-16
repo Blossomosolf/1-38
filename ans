@@ -1,1 +1,137 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from scipy import stats
+import math
+import statistics
+import seaborn as sns
+from IPython.display import display
 
+import pingouin as pg
+import researchpy   
+%matplotlib inline
+
+
+df_train = pd.read_csv("Titanic_train.csv")
+print(df_train.info())
+
+
+#做調整，把 Survived 變成離散型變數 Survived_cate
+
+df_train['Survived_cate']=df_train['Survived']
+df_train['Survived_cate']=df_train['Survived_cate'].astype('object')
+print(df_train.info())
+
+display(df_train.head(5))
+
+# Age:連續型 Survived_cate 為離散型，所以採用 Eta Squared
+# 取出資料後，把遺失值刪除
+complete_data=df_train[['Age','Survived_cate']].dropna()
+display(complete_data)
+aov = pg.anova(dv='Age', between='Survived_cate', data=complete_data, detailed=True)
+print(aov)
+
+etaSq = aov.SS[0] / (aov.SS[0] + aov.SS[1])
+etaSq
+
+def judgment_etaSq(etaSq):
+    if etaSq < .01:
+        qual = 'Negligible'
+    elif etaSq < .06:
+        qual = 'Small'
+    elif etaSq < .14:
+        qual = 'Medium'
+    else:
+        qual = 'Large'
+    return(qual)
+judgment_etaSq(etaSq)
+
+g = sns.catplot(x="Survived_cate", y="Age", hue="Survived_cate",
+               data=complete_data, kind="violin")
+
+#Q2
+
+# Sex:離散型 Survived_cate 為離散型，所以採用 Cramér's V
+
+contTable = pd.crosstab(df_train['Sex'], df_train['Survived_cate'])
+print(contTable)
+
+df = min(contTable.shape[0], contTable.shape[1]) - 1
+print(df)
+
+crosstab, res = researchpy.crosstab(df_train['Survived_cate'], df_train['Sex'], test='chi-square')
+#print(res)
+print("Cramer's value is",res.loc[2,'results'])
+
+# 這邊用卡方檢定獨立性，所以採用的 test 參數為卡方 "test =" argument.
+# 採用的變數在這個模組中，會自己根據資料集來判斷，Cramer's Phi if it a 2x2 table, or Cramer's V is larger than 2x2.
+
+
+# 寫一個副程式判斷相關性的強度
+def judgment_CramerV(df,V):
+    if df == 1:
+        if V < 0.10:
+            qual = 'negligible'
+        elif V < 0.30:
+            qual = 'small'
+        elif V < 0.50:
+            qual = 'medium'
+        else:
+            qual = 'large'
+    elif df == 2:
+        if V < 0.07:
+            qual = 'negligible'
+        elif V < 0.21:
+            qual = 'small'
+        elif V < 0.35:
+            qual = 'medium'
+        else:
+            qual = 'large'
+    elif df == 3:
+        if V < 0.06:
+            qual = 'negligible'
+        elif V < 0.17:
+            qual = 'small'
+        elif V < 0.29:
+            qual = 'medium'
+        else:
+            qual = 'large'
+    elif df == 4:
+        if V < 0.05:
+            qual = 'negligible'
+        elif V < 0.15:
+            qual = 'small'
+        elif V < 0.25:
+            qual = 'medium'
+        else:
+            qual = 'large'
+    else:
+        if V < 0.05:
+            qual = 'negligible'
+        elif V < 0.13:
+            qual = 'small'
+        elif V < 0.22:
+            qual = 'medium'
+        else:
+            qual = 'large'
+    return(qual)
+
+judgment_CramerV(df,res.loc[2,'results'])
+
+g= sns.countplot(x="Sex", hue="Survived_cate", data=df_train)
+
+
+#Q3
+
+# Age 連續 , Fare 連續，用 Pearson 相關係數
+
+# 取出資料後，把遺失值刪除
+complete_data=df_train[['Age','Fare']].dropna()
+display(complete_data)
+
+# 由於 pearsonr 有兩個回傳結果，我們只需取第一個回傳值為相關係數
+corr, _=stats.pearsonr(complete_data['Age'],complete_data['Fare'])
+print(corr)
+#代表身高和體重有高度線性相關
+
+g = sns.regplot(x="Age", y="Fare", color="g",data=complete_data)
